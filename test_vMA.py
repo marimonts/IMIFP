@@ -88,8 +88,6 @@ def getNumber(max = 2048, min = 0):
 		index = raw_input("Give an index: ").strip()
 	return int(index)
 
-IFP = 1
-HEADER = 0
 
 def deleteNonCommon(positions, aa, only_data):
 	# Find positions which are not in all matrices
@@ -111,30 +109,41 @@ def deleteNonCommon(positions, aa, only_data):
 		only_curated_data.append(only_data[i])
 	return list(positions), list(aa), only_curated_data
 
-def TanimotoCoef(mset1, mset2):
-	flat_set1 = []
-	for subset in mset1:
-		for item in subset:
-			flat_set1.append(item)
-	flat_set2 = []
-	for subset in mset2:
-		for item in subset:
-			flat_set2.append(item)
+# Returns how many bits are set in the binary representation of a number of any length
+def getSetBits(val):
+	n = 0
+	while(val > 0):
+		n+=val&1
+		val = val>>1
 
-	intersection = 0
-	i = 0
-	for l in flat_set1:
-		if flat_set1[i] ==  flat_set2[i]:
-			intersection = intersection + 1
-		i = i + 1
-	
-	union = len(flat_set1) + len(flat_set2) - intersection
-	Tc = float(intersection)/union
-	print Tc
+	return n
 
+# Returns the tanimoto score of two ifps (default:0x7f takes all bits into acount)
+def getTanimoto(ifp1, ifp2, mask=0x7f):
+	a_sum = 0
+	b_sum = 0
+	c_sum = 0
 
+	# For every ifp in the provided lists:
+	for i in range(1, len(ifp1)):
+		for j in range(0, i):
+			# Perform bitmask operation
+			a = ifp1[i][j] & mask
+			b = ifp2[i][j] & mask
 
+			# Add new values
+			a_sum += getSetBits( a )
+			b_sum += getSetBits( b )
+			c_sum += getSetBits( a & b )	# Determine number of bits set (1) in both ifps
+			
+	# Catch division by zero errors if both ifps are 0!
+	try:
+		tanimoto = float(c_sum) / abs( a_sum + b_sum - c_sum )
+	except ZeroDivisionError:
+		# Make tanimoto 1.0 as ifps are both 0 and thus equal
+		tanimoto = 0.0
 
+	return tanimoto
 
 			
 				
@@ -181,11 +190,17 @@ for mtrx in mtrices:
 	size = len(mtrx)
 	only_data.append(np.array(decimals).reshape(size,size))
 
- 	
 positions_curated, aa_curated, only_curated_data = deleteNonCommon(number_list, aa_list, only_data)
 
+print positions_curated	
+print getTanimoto(only_curated_data[0], only_curated_data[1])
+# For every ifp in the provided lists:
+#print only_curated_data[0]
+#print only_curated_data[2]
 
-TanimotoCoef(only_curated_data[0], only_curated_data[1])
+#print getTanimoto(only_curated_data[0], only_curated_data[2])
+
+#print getTanimoto(only_curated_data[0], only_curated_data[1])
 
 """Converting to numpy arrays for plotting + heatmap plotting"""
 
