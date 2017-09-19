@@ -170,15 +170,7 @@ def cutMatrix(matrix, positions):
 		indeces_common.append(matrix[1].index(q)) # Convert common positions to corresponding indeces
 	residues_curated = []
 	for i in indeces_common:
-		print i
-		print matrix[0][i]
-		#residues_curated = matrix[0].pop(i)
-	print residues_curated
-
-	"""I am trying to retrieve a curated list of aminacids for the html output, 
-	the idea was to get the indices from the common positions and create a list of aminoacids
-	with those indices with the function "pop", but realised that by doing it in a for loop
-	to iterate over all the indices, the indices in each iteration change"""
+		residues_curated.append(matrix[0][i])
 
 	# Convert to a numpy array
 	size = len(matrix[1])
@@ -254,7 +246,9 @@ common = getCommonPositions(mtrices)
 # similarityMatrixPlot(tanimoto_similarity, "Tanimoto_similarity_matrix.png")
 # FM = frequencyMatrix(mtrices, common, mask=0x7f, exactFilter="FALSE")
 # frequencyMatrixPlot(FM, common, "frequency_matrix.png")
-print cutMatrix(mtrices[0], common)
+for matrix in mtrices:
+	temp = cutMatrix(matrix, common)
+	"""UGLYYYYYYYYYYY"""
 
 #Creating html output file for data visualization
 html_file = open("ifp_output.html", "w")
