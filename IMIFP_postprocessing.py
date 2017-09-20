@@ -155,22 +155,25 @@ def similarityMatrixPlot(tanimoto_similarity, filename, filepath=""):
 	# for x in xrange(width):
 	#     for y in xrange(height):
 	#         pl.annotate(round(arr[x][y], 2), xy=(y, x))
-	pl.show()	
 	pl.savefig(filepath+filename)
-	pl.clf()
-	fig.savefig(filepath+filename)
+	#pl.clf()
 
-def cutMatrix(matrix, positions):
-	indeces_uncommon = []
+def cutMatrixAA(matrix, positions):
 	indeces_common = []
-	uncommon = set(matrix[1]) - set(positions) # get a list of uncommon positions
-	for p in uncommon:
-		indeces_uncommon.append(matrix[1].index(p)) # Convert uncommon positions to corresponding indeces
+	
 	for q in positions:
 		indeces_common.append(matrix[1].index(q)) # Convert common positions to corresponding indeces
 	residues_curated = []
 	for i in indeces_common:
 		residues_curated.append(matrix[0][i])
+
+	return residues_curated
+
+def cutMatrixIFP(matrix, positions):
+	indeces = []
+	uncommon = set(matrix[1]) - set(positions) # get a list of uncommon positions
+	for p in uncommon:
+		indeces.append(matrix[1].index(p)) # Convert uncommon positions to corresponding indeces
 
 	# Convert to a numpy array
 	size = len(matrix[1])
@@ -178,7 +181,7 @@ def cutMatrix(matrix, positions):
 	matrix = np.delete(matrix, indeces, 0) # delete rows of uncommon indeces
 	matrix = np.delete(matrix, indeces, 1) # delete columns of uncommon indeces
 
-	return matrix, residues_curated
+	return matrix
 
 def frequencyMatrix(matrices, positions, mask=0x7f, exactFilter="TRUE"):
 	# Determine the number of positions
@@ -186,7 +189,7 @@ def frequencyMatrix(matrices, positions, mask=0x7f, exactFilter="TRUE"):
 	sumarrays = 0
 	total = len(matrices)
 	for matrix in matrices:
-		arr = cutMatrix(matrix, positions)[0]
+		arr = cutMatrixIFP(matrix, positions)
 		if(exactFilter == "TRUE"):
 			arr[(arr & mask) != mask] = 0
 		else:
@@ -215,12 +218,8 @@ def frequencyMatrixPlot(matrix, positions, filename, filepath=""):
 # for x in xrange(width):
 #     for y in xrange(height):
 #         pl.annotate(round(arr[x][y], 2), xy=(y, x))
-	pl.show()
 	pl.savefig(filepath+filename)
-	pl.clf()
-
-	fig.savefig(filepath+filename)
-
+	#pl.clf()
 				
 """Begin"""
 
@@ -230,7 +229,9 @@ output_ifps = "IMIFP_output_ifps.txt"
 text_input = input.read()
 output1 = open(output_ifps, "w")
 
-
+print "-------------------- IMIFP ---------------------\n\n"
+sys.stdout.write("Reading file " + filename + "...")
+sys.stdout.flush()
 """ Split text in blocks, each containing one matrix, skip first """
 text_split = text_input.split("All atom comparison\n")[1:]
 
@@ -241,14 +242,46 @@ for mtrx in text_split:
 
 # mtrices has one element/matrix in the input. Each matrix is also a list, first element AA, second element number, third element 7-bit ifps
 
-common = getCommonPositions(mtrices)
-# tanimoto_similarity = similarityMatrix(mtrices, common, 0x7f)
-# similarityMatrixPlot(tanimoto_similarity, "Tanimoto_similarity_matrix.png")
-# FM = frequencyMatrix(mtrices, common, mask=0x7f, exactFilter="FALSE")
-# frequencyMatrixPlot(FM, common, "frequency_matrix.png")
+common_positions = getCommonPositions(mtrices)
+
+sys.stdout.write("DONE\n\n")
+sys.stdout.flush()
+
+
+# Create a similarity matrix between all matrix combinations based on the tanimoto score
+sys.stdout.write("Calculating tanimoto based similarity matrix...")
+sys.stdout.flush()
+
+tanimoto_similarity = similarityMatrix(mtrices, common_positions, 0x7f)
+similarityMatrixPlot(tanimoto_similarity, "tanimoto_similarity_matrix.png")
+
+sys.stdout.write("DONE\nSaved as: tanimoto_similarity_matrix.png\n\n")
+sys.stdout.flush()
+
+
+
+# Create a frequency matrix of occuring interactions
+sys.stdout.write("Calculating frequency interaction matrix...")
+sys.stdout.flush()
+
+FM = frequencyMatrix(mtrices, common_positions, mask=0x7f, exactFilter="FALSE")
+frequencyMatrixPlot(FM, common_positions, "frequency_matrix.png")
+
+sys.stdout.write("DONE\nSaved as: frequency_matrix.png\n\n")
+sys.stdout.flush()
+
+
+
+
+sys.stdout.write("Creating HTML output file...")
+sys.stdout.flush()
+
+aa_curated = []
+only_curated_data = []
 for matrix in mtrices:
-	temp = cutMatrix(matrix, common)
-	"""UGLYYYYYYYYYYY"""
+	aa_curated.append(cutMatrixAA(matrix, common_positions))
+	only_curated_data.append(cutMatrixIFP(matrix, common_positions))
+
 
 #Creating html output file for data visualization
 html_file = open("ifp_output.html", "w")
@@ -280,7 +313,7 @@ for row in range(len(only_curated_data[0])):
 				header.append(aa_curated[i][row] + "-" + aa_curated[i][col])
 
 			html = html_generator.ifpTable(cell, header)
-			html = html_generator.makeTableRow( [str(positions_curated[0][row]) + "-" + str(positions_curated[0][col]), html] )
+			html = html_generator.makeTableRow( [str(common_positions[row]) + "-" + str(common_positions[col]), html] )
 			html_file.write(html)
 
 
@@ -289,6 +322,9 @@ html_file.write("</body></font>\n</html>")
 
 html_file.close()
 
-output1.close()	
+sys.stdout.write("DONE\nWritten to: ifp_output.html\n\n")
+sys.stdout.flush()
+
+output1.close()
 
 input.close()
