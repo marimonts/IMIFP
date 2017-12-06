@@ -42,14 +42,19 @@ def preprocessMatrix(text):
 			ifp_line = temp[1].strip()
 			if len(ifp_line) % 7 == 0:
 				while ifp_line:
-					ifp_row.append( int(ifp_line[:7],2) )	# Convert ifp bitstring to decimal number
+					rev_ifp = str(ifp_line[:7])[::-1]
+					unified_ifp = (rev_ifp[0] or rev_ifp[1]) + (rev_ifp[2] or rev_ifp[3]) + (rev_ifp[4] or rev_ifp[5]) + rev_ifp[6]
+					print int(unified_ifp,2)
+					ifp_row.append( int(unified_ifp,2) )	# Convert ifp bitstring to decimal number
 					ifp_line = ifp_line[7:]					# Delete processed from the line
 				# Save the this row of ifps as list of lists
 				ifps.append(ifp_row)	
+
 			else:
 				print "IFPs no multiple of 7!"	
 		else:
 			break
+
 
 	return list([aminoacids, positions, ifps])
 
@@ -367,10 +372,12 @@ def getTanimoto(m1, m2, mask=0x7f):
 	return tanimoto
 
 def npTanimotoXgroup(npmatrix, mask=0x7f):
+	nr_col_matrix = np.shape(npmatrix)[1]
 	column_Tcs = []
  	for row in npmatrix:
+ 		row = row[1:]
  		Tcs = []
- 		len_row = len(row)-1
+ 		len_row = len(row)
  		for i in range(1, len_row):
  			for j in range (0, i):
 
@@ -391,7 +398,7 @@ def npTanimotoXgroup(npmatrix, mask=0x7f):
 				Tcs.append(tanimoto)
 		
 		column_Tcs.append(sum(Tcs))
-	npmatrix = np.insert(npmatrix, 6, column_Tcs, axis=1)	
+	npmatrix = np.insert(npmatrix, nr_col_matrix, column_Tcs, axis=1)	
 
 	return npmatrix
 
@@ -402,41 +409,61 @@ def featureSelection(bin_nparray, mask=0x7f):
  	# create a unique column for the positions with a int format (residues contained in two last columns)
  	positionX = []
  	for x in list_columns[-2]:
- 		positionXappend(x)
+ 		positionX.append(x)
  	positionY = []
   	for y in list_columns[-1]:
  		positionY.append(y)	
  	interacting_positions = []
- 	for i in range(len(list_columns10)): 
+ 	for i in range(len(positionX)): 
  			interacting_positions.append((str(positionX[i][0])+ str(positionY[i][0])))
  	
  	#merging the columns that cluster together... HARD CODING! 
- 	inactives = np.concatenate((list_columns[0], list_columns[2], list_columns[4], list_columns[6], list_columns[8]), axis=1)
- 	actives = np.concatenate((list_columns[1], list_columns[3], list_columns[5], list_columns[7], list_columns[9]), axis=1)
- 	inactives = np.insert(inactives, 5, interacting_positions, axis =1)
- 	actives = np.insert(actives, 5, interacting_positions, axis =1)
+ 	inactives = np.concatenate((list_columns[0:5]), axis=1)
+ 	ni = np.shape(inactives)[1] # how many receptors in the group for future parameters
+ 	actives = np.concatenate((list_columns[5:10]), axis=1)
+ 	na = np.shape(actives)[1] # how many receptors in the group for future parameters
+ 	test_set = np.concatenate((list_columns[0:10]), axis=1)
+	nt = np.shape(test_set)[1] # how many receptors in the group for future parameters
+
+ 	inactives = np.insert(inactives, 0, interacting_positions, axis =1)
+ 	actives = np.insert(actives, 0, interacting_positions, axis =1)
+ 	test_set = np.insert(test_set, 0, interacting_positions, axis=1)
 
  	#Adding a column to the end with the sum of all Tc possible combination
  	inactives = npTanimotoXgroup(inactives)
  	actives = npTanimotoXgroup(actives)
+ 	
  	#sort each array based on the Tc sum and store it back
- 	tmp = np.argsort(inactives[:,6])[::-1]
- 	tmp2 = np.argsort(actives[:,6])[::-1]
+ 	tmp = np.argsort(inactives[:,(ni+1)])[::-1] # ni + 1 represents the last column after the IFPs of this group
+ 	tmp2 = np.argsort(actives[:,(na+1)])[::-1] # na + 1 represents the last column after the IFPs of this group
  	inactives = inactives[tmp]
  	actives = actives[tmp2]
 
- 	# sum IFP values (contained in [0:5] and insert a new column in the end with the result)
+ 	# sum IFP values (contained in [0:5] and insert a new column in the end with the result) AND add more value if the IFP has a polar bit (0bXXX1111)
+	sumi = ni+2 # will represent the index of the column of Tc sum of this group
 	sum_inactives = []
+	polarmask = 0b0001111 # select here mask to assign extra value to the IFP, 0b0001111 = extra weight to any polar interaction
 	for row in inactives:
-		sum_inactives.append(sum(row[0:5]))
+		counter = 0
+		#for item in row[1:-1]:
+		#	if (item & polarmask) > 0:
+		#		counter = counter + 40 # assign here how much extra weight to give to polar interactions
+		sum_R = sum(row[1:-1])
+		sum_inactives.append((sum_R + counter)/ni)
 	sum_inactives = np.array(sum_inactives)
-	inactives = np.insert(inactives, 7, sum_inactives, axis=1)
-	
+	inactives = np.insert(inactives, sumi, sum_inactives, axis=1)
+
+	suma = na+2 # will represent the index of the column of Tc sum of this group
 	sum_actives = []
 	for row in actives:
-		sum_actives.append(sum(row[0:5]))
+		counter = 0
+		#for item in row[1:-1]:
+		#	if (item & polarmask) > 0:
+		#		counter =+ 40 # assign here how much extra weight to give to polar interactions
+		sum_R = sum(row[1:-1])
+		sum_actives.append((sum_R + counter)/na)
 	sum_actives = np.array(sum_actives)
-	actives = np.insert(actives, 7, sum_actives, axis=1)
+	actives = np.insert(actives, suma, sum_actives, axis=1)
 	
 	# creating files with all inactive and inactive ordered based on the similarity per group, calculate difference of the Tcs sum
 	commoninactives = []
@@ -444,8 +471,8 @@ def featureSelection(bin_nparray, mask=0x7f):
 	sum_difference = []
 	for rowinactives in inactives:
 		for rowactives in actives:
-			if rowinactives[5] == rowactives[5]:
-				sum_difference.append(abs(rowinactives[7] - rowactives[7]))
+			if rowinactives[0] == rowactives[0]: #use index of interaction positions (always first column)
+				sum_difference.append(abs(rowinactives[sumi] - rowactives[suma])) #use indeces of IFP sums
 				commoninactives.append(rowinactives)
 				commonactives.append(rowactives)
 	sum_difference = np.array(sum_difference)
@@ -454,57 +481,105 @@ def featureSelection(bin_nparray, mask=0x7f):
 	np.savetxt(output3, commoninactives, fmt='%d',delimiter='	', newline='\n')
 	np.savetxt(output4, commonactives, fmt='%d',delimiter='	', newline='\n')
 	
-	commoninactives = np.insert(commoninactives, 8, sum_difference, axis=1)
-	
+	lastcol = np.shape(commoninactives)[1]
+	commoninactives = np.insert(commoninactives, lastcol, sum_difference, axis=1) # add difference of IFP sums at the end
+
 	# creating an array+txt file with IFPS of a group, their interaction positions, Tcsum, IFPs of the other group, their Tcsum, and IFP sum difference
 	whole_set = np.array(commoninactives)
-	whole_set = np.delete(whole_set, 7, axis=1)
-	whole_set = np.insert(whole_set, 7, commonactives[:,0], axis=1)
-	whole_set = np.insert(whole_set, 8, commonactives[:,1], axis=1)
-	whole_set = np.insert(whole_set, 9, commonactives[:,2], axis=1)
-	whole_set = np.insert(whole_set, 10, commonactives[:,3], axis=1)
-	whole_set = np.insert(whole_set, 11, commonactives[:,4], axis=1)
-	whole_set = np.insert(whole_set, 12, commonactives[:,6], axis=1)
-	np.savetxt(output7, whole_set, fmt='%d',delimiter='	', newline='\n')
+	whole_set = np.delete(whole_set, sumi, axis=1) #delete sum IFPs first group
 
+	commonactives = np.delete(commonactives, 0, axis=1)
+	for column in range((np.shape(commonactives)[1])-1): # range corresponding to number of receptors = columns -1 (last columns are not IFPs)
+		whole_set = np.insert(whole_set, (sumi + column), commonactives[:,column], axis=1) # add receptors in position (sumi + column), so number of columns plus iterator, and in the end add sum Tcs group2
+
+	#delete redundancy (delete rows that represent the same interaction)(e.g. 349350 = 350349)
+	pos_todelete = []
+	for pos in whole_set[:,0]: #use index of column interaction positions
+		pos = str(pos)
+		tmp1 = pos[0:3] 
+		tmp2 = pos[-3:]
+		if tmp1 > tmp2:
+			pos_todelete.append(int(pos))
+	
+	clean_whole_set = []
+	for row in whole_set:
+		if row[0] in pos_todelete: #use index of interaction positions
+			pass
+		else:
+			clean_whole_set.append(row)
+	clean_whole_set = np.array(clean_whole_set)	
+
+	#delete redundancy (delete rows that represent the same interaction)(e.g. 349350 = 350349)
+	test_set_clean = []
+	for row in test_set:
+		if row[0] in pos_todelete:
+			pass
+		else:
+			test_set_clean.append(row)
+	test_set_clean = np.array(test_set_clean)
+	
+	np.savetxt(output5, clean_whole_set, fmt='%d',delimiter='	', newline='\n') # create tab separated text file 
+
+	return clean_whole_set, test_set_clean, ni
 #for filtering out Tc sums lower than a certain cutoff and save in txt files
-
 	#rowfilter_inactives, rowfilter_actives = TcSumFilter(inactives, actives)
-#
-	## make a list of unique positions by getting the set difference between the whole set and the common set
-	#uniquesI = np.setdiff1d(rowfilter_inactives[:,5], commoninactives[:,5])
-	#uniquesA = np.setdiff1d(rowfilter_actives[:,5], commonactives[:,5])
-	#
-	##extract from the whole set the ones contained in the uniques list
-	#uniqueinactives = []
-	#uniqueactives = []
-	#for rowinactives in rowfilter_inactives:
-	#	if rowinactives[5] in uniquesI:
-	#		uniqueinactives.append(rowinactives)
-
-#
-	#for rowactives in rowfilter_actives:
-	#	if rowactives[5] in uniquesA:
-	#		uniqueactives.append(rowactives)
-	#uniqueactives = np.array(uniqueactives)
- 	
-
 
 def TcSumFilter(arr1, arr2):
+	#returns arrays (one x group) after filtering out rows under a certain cutoff of Tcsum
 	rowfilter_arr1 = []
 	for row in arr1:
-		if row[6] >= 6:
+		if row[6] >= 6:## hard coding, change if used 
 			rowfilter_arr1.append(row)
 	rowfilter_arr1 = np.array(rowfilter_arr1) 
 	
 	rowfilter_arr2 = []
 	for row in arr2:
-		if row[6] >= 6:
+		if row[6] >= 6:## hard coding, change if used 
 			rowfilter_arr2.append(row)
 	rowfilter_arr2 = np.array(rowfilter_arr2)
 
 	return rowfilter_arr1, rowfilter_arr2 
-						
+
+def clustering(clean_whole_set, test_set_clean, ni, nr_features):
+
+
+	sorted_set = clean_whole_set[clean_whole_set[:,-1].argsort()[::-1]] #sort entries based on sum_differences
+
+	#store the label of the features to select then in the test set
+	selected_features = []
+	for row in sorted_set[0:nr_features]: # how many features to consider with best sum_differences score
+		selected_features.append(row[0]) # row[0] --> interaction positions label
+
+	top50 = sorted_set[0:nr_features] # (*) get ranking features with best sum_differences score 
+	shape_col =  np.shape(top50)[1]
+	top50 = np.delete(top50, (shape_col-1, shape_col-2), axis=1) # make table suitable for Kmeans, delete non IFP data columns
+	top50 = np.delete(top50, 0, axis=1) # make table suitable for Kmeans, delete non IFP data columns
+	top50 = np.delete(top50, ni, axis=1) # make table suitable for Kmeans, delete non IFP data columns
+
+	training_set = np.array(top50)
+
+		# select only data of the selected features in the test set for Kmeans comparison 
+	test_set_selectedFeatures = []
+	for item in selected_features:
+		for row in test_set_clean:
+			if row[0] == item:
+				test_set_selectedFeatures.append(row)
+			else:
+				pass
+
+	test_set_selectedFeatures = np.array(test_set_selectedFeatures)
+	
+	test_set = np.delete(test_set_selectedFeatures, 0, axis=1) # make table suitable for Kmeans, delete non IFP data columns 
+
+	top50 = np.transpose(top50) # make table suitable for Kmeans, axis = samples (x, rows), features (y, columns)
+	training_set = np.transpose(training_set)
+	test_set = np.transpose(test_set)
+	kmeans_clustering =  KMeans(n_clusters=2).fit(training_set)
+	print kmeans_clustering.labels_
+	print kmeans_clustering.predict(test_set)
+
+
+					
 """Begin"""
 
 filename = sys.argv[1]
@@ -514,9 +589,8 @@ text_input = input.read()
 output2 = open(output_PCA, "w")
 output3 = open("inactives_conserved_interactions.txt", "w")
 output4 = open("actives_conserved_interactions.txt", "w")
-output5 = open("inactives_unique_interactions.txt", "w")
-output6 = open("actives_unique_interactions.txt", "w")
-output7 = open("whole_set.txt", "w")
+output5 = open("whole_set.txt", "w")
+
 
 print "-------------------- IMIFP ---------------------\n\n"
 sys.stdout.write("Reading file " + filename + "...")
@@ -565,7 +639,8 @@ list_interactions = ['550-644','246-640', '132-137']
 # sys.stdout.flush()
 
 array_conservedout = conservedOut(mtrices, common_positions) 
-featureSelection(array_conservedout)
+clean_whole_set, test_set_clean, ni = featureSelection(array_conservedout)
+clustering(clean_whole_set, test_set_clean, ni, 50)
 #nonconserved_SM = similarityMatrix(array_conservedout)
 #similarityMatrixPlot(nonconserved_SM, "tanimoto_similarity_nonconserved_matrix.png")
 
@@ -626,7 +701,7 @@ output2.close()
 output3.close()
 output4.close()
 output5.close()
-output6.close()
-output7.close()
+
+
 
 input.close()
