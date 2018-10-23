@@ -1,0 +1,56 @@
+html, body {
+	padding, margin: 0px;
+	width: 100%;
+	height: 100%;
+
+	font-family: Tahoma, Geneva, sans-serif;
+}
+
+table {
+	border: 1px solid black;
+}
+
+td {
+	text-align: center;
+	width: 200px;
+}
+
+.rotate {
+	transform: rotate(90deg);
+}
+
+.bit0 {
+	background: #FFFFFF;
+}
+
+.bit1 {
+	background: #FFA248;
+}
+
+.bit2 {
+	background: #007ADA;
+}
+
+.bit3 {
+	background: #A30092;
+}
+
+.bit4 {
+	background: #FF004F;
+}
+
+.bit5 {
+	background: #00C564;
+}
+
+.bit6 {
+	background: #5A7832;
+}
+
+.bit7 {
+	background: #00C0F7;
+}
+
+.bit8 {
+	background: #D585A7;
+}

@@ -1,17 +1,19 @@
 import numpy as np
-
+"""
 # Create a small table that displays every bit value of a list of ifps and colors the background correspondingly
-def ifpTable(ifps, header=False):
-	cmap = ["FFFFFF", "FFA248", "007ADA", "A30092", "FF004F", "00C564", "5A7832", "00C0F7"]
+def ifpTable(ifps, bits=7, header=False):
+	cmap = ["FFFFFF", "FFA248", "007ADA", "A30092", "FF004F", "00C564", "5A7832", "00C0F7", "D585A7"]
 	html = "<table border=1 width='50%'>"
 	
+	# If provided, create a descriptive bold header for each column
 	if header != False:
 		html = html + "<tr>"
 		for h in header:
 			html = html  + "<td align='center'><b>" + str(h) + "</b></td>"
 		html = html + "</tr>\n"
 
-	for i in range(6,-1,-1):
+	# Create a cell for every ifp bit, color background of cell corresponding to interaction type
+	for i in range(bits-1,-1,-1):
 		html = html + "<tr>"
 		for ifp in ifps:
 			bit = (ifp >> i) & 1
@@ -21,11 +23,39 @@ def ifpTable(ifps, header=False):
 	html = html + "</table>\n"
 
 	return html
+"""
+# Create a small table that displays every bit value of a list of ifps and colors the background correspondingly
+def ifpTable(ifps, bits=7, header=False):
+	cmap = ["FFFFFF", "FFA248", "007ADA", "A30092", "FF004F", "00C564", "5A7832", "00C0F7", "D585A7"]
+	html = "<table>"
+	
+	# If provided, create a descriptive bold header for each column
+	if header != False:
+		html = html + "<tr class='header'>"
+		for h in header:
+			html = html  + "<td class='header'><b>" + str(h) + "</b></td>"
+		html = html + "</tr>\n"
 
-def makeTableRow(content):
-	html = "<tr>"
+	# Create a cell for every ifp bit, color background of cell corresponding to interaction type
+	for i in range(bits-1,-1,-1):
+		html = html + "<tr>"
+		for ifp in ifps:
+			bit = (ifp >> i) & 1
+			html = html + "<td class='bit" + str((i+1)*bit) + "''>" + str(bit) + "</td>"
+		html = html + "</tr>\n"
+
+	html = html + "</table>\n"
+
+	return html
+
+def makeTableRow(content, css_class=""):
+	if css_class == "":
+		html = "<tr>"
+	else:
+		html = "<tr class='" + css_class + "'>"
+	
 	for cell in content:
-		cell = "<td align='center'>" + cell + "</td>"
+		cell = "<td>" + cell + "</td>"
 		html = html + cell
 	return html + "</tr>\n\r"
 
